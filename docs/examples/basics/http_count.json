@@ -27,7 +27,7 @@
   "senders": {
     "batch": {
       "type": "batch",
-      "threshold": 1000,
+      "threshold": 1,
       "next": "count"
     },
     "count": {

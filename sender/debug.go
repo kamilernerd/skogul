@@ -56,7 +56,8 @@ func (db *Debug) Send(c *skogul.Container) error {
 	if err != nil {
 		return fmt.Errorf("encoding failed: %w", err)
 	}
-	fmt.Printf("%s%s\n", db.Prefix, b)
+	skogul.Printf("%s%s\n", db.Prefix, b)
+	// fmt.Printf("%s%s\n", db.Prefix, b)
 	return nil
 }
 
