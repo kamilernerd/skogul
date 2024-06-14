@@ -65,6 +65,7 @@ var ftimestamp = flag.Bool("timestamp", true, "Include timestamp in log entries"
 var fversion = flag.Bool("version", false, "Print skogul version")
 var fprofile = flag.String("pprof", "", "Enable profiling over HTTP, value is http endpoint, e.g: localhost:6060")
 var fplugins = flag.String("experimental-plugins", "", "Comma-separated list of .so files to load as plugins. This is completely unsupported tech preview to get experience with it.")
+var loghandler = flag.String("loghandler", "loghandler", "Name of the handler that handles logs")
 
 // Console width :D
 const helpWidth = 66
@@ -187,6 +188,13 @@ func main() {
 		}()
 	}
 	log.Info("Starting skogul")
+
+	if _, ok := c.Handlers[*loghandler]; ok {
+		skogul.LogHandler.H = &c.Handlers[*loghandler].Handler
+	} else {
+		skogul.LogHandler.H = &c.Handlers["log"].Handler
+	}
+
 
 	var exitInt = 0
 	var wg sync.WaitGroup

@@ -1,21 +1,25 @@
 {
   "receivers": {
-      "api": {
-        "type": "http",
-        "address": "[::1]:8080",
-	"log204ok": true,
-        "handlers": {
-          "/test": "jsontemplating"
-        },
-	"auth": {
-	 "/test": { "username": "lol", "password": "kek"}
-	}
+    "api": {
+      "type": "http",
+      "address": "[::1]:8080",
+      "log204ok": true,
+      "handlers": {
+        "/test": "jsontemplating"
+      },
+      "auth": {
+        "/test": { "username": "lol", "password": "kek" }
       }
+    }
   },
   "handlers": {
+    "loghandler": {
+      "parser": "skogul",
+      "sender": "log-batch"
+    },
     "jsontemplating": {
       "parser": "skogul",
-      "transformers": [  ],
+      "transformers": [],
       "sender": "count"
     },
     "debugger": {
@@ -25,15 +29,25 @@
     }
   },
   "senders": {
+		"log-batch": {
+			"type": "batch",
+			"next": "forward"
+		},
+		"forward": {
+			"type": "sleep",
+			"base": "1ms",
+			"maxdelay": "1s",
+			"next": "print"
+		},
     "batch": {
       "type": "batch",
-      "threshold": 1,
+      "threshold": 1000,
       "next": "count"
     },
     "count": {
-      "type": "counter",
+      "type": "null",
       "stats": "debugger",
-      "next": "null"
+      "next": "print"
     }
   }
 }

@@ -9,87 +9,103 @@ import (
 	"time"
 )
 
-type LogContainer struct {
-	Id     string    `json:"id"`
-	Time   time.Time `json:"time"`
-	Caller string    `json:"caller"`
-	Detail string    `json:"detail"`
-}
+var aggregateTimeDuration = time.Duration(time.Millisecond * 100)
 
-type Log struct {
-	LogBus *LogBus
-}
-
-func NewLog() *Log {
-	log := &Log{
-		LogBus: NewLogBus(),
+func NewLog() *LogBus {
+	aggregator := &LogAggregator{
+		aggregatorQueue:   make(chan Metric, 100),
+		outQueue:          make(chan Metric, 100),
+		batch:             make(map[string]Metric),
+		aggregateDuration: aggregateTimeDuration,
+		aggregateTime:     *time.NewTicker(aggregateTimeDuration),
 	}
 
-	go log.LogBus.RWStats()
-	go log.LogBus.Sink()
-	go log.LogBus.Flusher()
+	logbus := &LogBus{
+		aggregator:      aggregator,
+		queue:           make(chan Metric, 100),
+		writers:         map[string]func(msg string){},
+		logWrites:       0,
+		logReads:        0,
+		logWritesTicker: *time.NewTicker(rwTimeDuration),
+		logReadsTicker:  *time.NewTicker(rwTimeDuration),
+	}
 
-	return log
+	go aggregator.aggregate()
+	go logbus.RWStats()
+	go logbus.Sink()
+	go logbus.Flusher()
+
+	return logbus
 }
 
 var logger = NewLog()
 
 func Print(v ...any) {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprint(v...)))
+	logger.Push(buildLogMessage(fmt.Sprint(v...)))
 }
 
 func Printf(format string, v ...any) {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprintf(format, v...)))
+	logger.Push(buildLogMessage(fmt.Sprintf(format, v...)))
 }
 
 func Println(v ...any) {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprintln(v...)))
+	logger.Push(buildLogMessage(fmt.Sprintln(v...)))
 }
 
 func Error(v ...any) {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprint(v...)))
+	logger.Push(buildLogMessage(fmt.Sprint(v...)))
 	os.Exit(1)
 }
 
 func Errorf(format string, v ...any) error {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprintf(format, v...)))
+	logger.Push(buildLogMessage(fmt.Sprintf(format, v...)))
 	return errors.New(fmt.Sprintf(format, v...))
 }
 
 func Errorln(v ...any) error {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprintln(v...)))
+	logger.Push(buildLogMessage(fmt.Sprintln(v...)))
 	return errors.New(fmt.Sprintln(v...))
 }
 
 func Fatal(v ...any) error {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprint(v...)))
+	logger.Push(buildLogMessage(fmt.Sprint(v...)))
 	return errors.New(fmt.Sprint(v...))
 }
 
 func Fatalf(format string, v ...any) {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprintf(format, v...)))
+	logger.Push(buildLogMessage(fmt.Sprintf(format, v...)))
 	os.Exit(1)
 }
 
 func Fatalln(v ...any) {
-	logger.LogBus.Push(logger.buildLogMessage(fmt.Sprintln(v...)))
+	logger.Push(buildLogMessage(fmt.Sprintln(v...)))
 	os.Exit(1)
 }
 
-func (l *Log) buildLogMessage(detail string) LogContainer {
-	funcName, _ := l.callerFunc()
-	container := LogContainer{
-		Id:     funcName,
-		Time:   time.Now(),
-		Detail: detail,
+func buildLogMessage(detail string) Metric {
+	funcName, _ := callerFunc()
+	time := time.Now()
+	container := Metric{
+		Time: &time,
+		Metadata: map[string]interface{}{
+			"id":               funcName,
+			"aggregated_count": 0,
+		},
+		Data: map[string]interface{}{
+			"detail": detail,
+		},
 	}
 	return container
 }
 
-func (l *Log) callerFunc() (string, string) {
+func callerFunc() (string, string) {
 	pc, _, _, _ := runtime.Caller(3)
 	callerFuncStackPath := runtime.FuncForPC(pc).Name()
 	callerFunc := strings.Split(callerFuncStackPath, "/")
 	funcName := callerFunc[len(callerFunc)-1]
 	return funcName, callerFuncStackPath
+}
+
+func GetLogger() *LogBus {
+	return logger
 }
