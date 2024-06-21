@@ -7,22 +7,24 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/telenornms/skogul"
 )
 
 var aggregateTimeDuration = time.Duration(time.Millisecond * 100)
 
 func NewLog() *LogBus {
 	aggregator := &LogAggregator{
-		aggregatorQueue:   make(chan Metric, 100),
-		outQueue:          make(chan Metric, 100),
-		batch:             make(map[string]Metric),
+		aggregatorQueue:   make(chan skogul.Metric, 100),
+		outQueue:          make(chan skogul.Metric, 100),
+		batch:             make(map[string]skogul.Metric),
 		aggregateDuration: aggregateTimeDuration,
 		aggregateTime:     *time.NewTicker(aggregateTimeDuration),
 	}
 
 	logbus := &LogBus{
 		aggregator:      aggregator,
-		queue:           make(chan Metric, 100),
+		queue:           make(chan skogul.Metric, 100),
 		writers:         map[string]func(msg string){},
 		logWrites:       0,
 		logReads:        0,
@@ -82,14 +84,14 @@ func Fatalln(v ...any) {
 	os.Exit(1)
 }
 
-func buildLogMessage(detail string) Metric {
+func buildLogMessage(detail string) skogul.Metric {
 	funcName, _ := callerFunc()
 	time := time.Now()
-	container := Metric{
+	container := skogul.Metric{
 		Time: &time,
 		Metadata: map[string]interface{}{
 			"id":               funcName,
-			"aggregated_count": 0,
+			"aggregated_count": 1,
 		},
 		Data: map[string]interface{}{
 			"detail": detail,

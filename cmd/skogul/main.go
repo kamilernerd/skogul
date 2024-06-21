@@ -43,6 +43,7 @@ import (
 	"github.com/telenornms/skogul"
 	"github.com/telenornms/skogul/config"
 	"github.com/telenornms/skogul/encoder"
+	log "github.com/telenornms/skogul/log"
 	"github.com/telenornms/skogul/parser"
 	"github.com/telenornms/skogul/receiver"
 	"github.com/telenornms/skogul/sender"
@@ -65,7 +66,7 @@ var ftimestamp = flag.Bool("timestamp", true, "Include timestamp in log entries"
 var fversion = flag.Bool("version", false, "Print skogul version")
 var fprofile = flag.String("pprof", "", "Enable profiling over HTTP, value is http endpoint, e.g: localhost:6060")
 var fplugins = flag.String("experimental-plugins", "", "Comma-separated list of .so files to load as plugins. This is completely unsupported tech preview to get experience with it.")
-var loghandler = flag.String("loghandler", "loghandler", "Name of the handler that handles logs")
+var loghandler = flag.String("loghandler", "loghandler", "Name of the handler that handles the logs")
 
 // Console width :D
 const helpWidth = 66
@@ -138,7 +139,13 @@ func main() {
 	flag.Parse()
 
 	skogul.ConfigureLogger(*floglevel, *ftimestamp, *flogformat)
-	log := skogul.Logger("cmd", "main")
+	// log := skogul.Logger("cmd", "main")
+
+	log.LogHandler.Name = "loghandler"
+	log.LogHandler.H = &skogul.Handler{
+		Sender: &sender.Debug{},
+	}
+
 	err := loadPlugins()
 	if err != nil {
 		fmt.Printf("Unable to load plugins: %v\n", err)
@@ -161,7 +168,7 @@ func main() {
 	configPath := ""
 
 	if *fconfigDir != "" {
-		log.Warnf("Using -d is deprecated, use -f instead - it has the exact same functionality.")
+		log.Printf("Using -d is deprecated, use -f instead - it has the exact same functionality.")
 		configPath = *fconfigDir
 	} else {
 		configPath = *ffile
@@ -169,32 +176,31 @@ func main() {
 
 	c, err := config.Path(configPath)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to configure Skogul")
+		log.Errorf("%v Failed to configure skogul", err)
+		// log.WithError(err).Fatal("Failed to configure Skogul")
 	}
 
 	if *fconf {
 		out, err := json.MarshalIndent(c, "", "  ")
 		if err != nil {
-			fmt.Println("Configuration failed to marshal:", err)
+			log.Println("Configuration failed to marshal:", err)
 			os.Exit(1)
 		}
 		fmt.Println(string(out))
 		os.Exit(0)
 	}
 	if *fprofile != "" {
-		log.Warnf("Enabling profiling on %s", *fprofile)
+		log.Errorf("Enabling profiling on %s", *fprofile)
 		go func() {
 			http.ListenAndServe(*fprofile, nil)
 		}()
 	}
-	log.Info("Starting skogul")
+	log.Println("Starting skogul")
 
 	if _, ok := c.Handlers[*loghandler]; ok {
-		skogul.LogHandler.H = &c.Handlers[*loghandler].Handler
+		log.LogHandler.H = &c.Handlers[*loghandler].Handler
 	} else {
-		skogul.LogHandler.H = &c.Handlers["log"].Handler
 	}
-
 
 	var exitInt = 0
 	var wg sync.WaitGroup

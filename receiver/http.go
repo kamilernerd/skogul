@@ -35,8 +35,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/telenornms/skogul"
+	log "github.com/telenornms/skogul/log"
 )
 
 var httpLog = skogul.Logger("receiver", "http")
@@ -100,7 +100,7 @@ func (auth *HTTPAuth) auth(r *http.Request) error {
 		username, pw, ok := r.BasicAuth()
 		success := ok && auth.Username == username && auth.Password.Expose() == pw
 		if !success {
-			return skogul.Errorf("invalid credentials")
+			return log.Errorf("invalid credentials")
 			// return fmt.Errorf("Invalid credentials")
 		}
 
@@ -115,7 +115,7 @@ func (auth *HTTPAuth) auth(r *http.Request) error {
 		return nil
 	}
 
-	return skogul.Errorf("no matching authentication method")
+	return log.Errorf("no matching authentication method")
 	// return fmt.Errorf("no matching authentication method")
 }
 
@@ -146,7 +146,7 @@ func (rcvr receiver) handle(w http.ResponseWriter, r *http.Request) (int, error)
 	if r.ContentLength == 0 {
 		atomic.AddUint64(&rcvr.settings.stats.NoData, 1)
 
-		return 400, skogul.Errorf("no body in HTTP request")
+		return 400, log.Errorf("no body in HTTP request")
 		// return 400, fmt.Errorf("no body in HTTP request")
 	}
 
@@ -154,7 +154,7 @@ func (rcvr receiver) handle(w http.ResponseWriter, r *http.Request) (int, error)
 
 	if _, err := io.ReadFull(r.Body, b); err != nil {
 		atomic.AddUint64(&rcvr.settings.stats.ReadFailed, 1)
-		return 400, skogul.Errorf("read error on http body: %w", err)
+		return 400, log.Errorf("read error on http body: %w", err)
 		// return 400, fmt.Errorf("read error on http body: %w", err)
 	}
 
@@ -171,14 +171,14 @@ func (rcvr receiver) handle(w http.ResponseWriter, r *http.Request) (int, error)
 func (rcvr receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	code, err := rcvr.handle(w, r)
 	if err != nil {
-		skogul.Printf("%d %s %d %s", code, r.RequestURI, r.ContentLength, "HTTP request failed")
+		log.Printf("%d %s %d %s", code, r.RequestURI, r.ContentLength, "HTTP request failed")
 		// httpLog.WithFields(log.Fields{
 		// 	"code":          code,
 		// 	"remoteAddress": r.RemoteAddr,
 		// 	"requestUri":    r.RequestURI,
 		// 	"ContentLength": r.ContentLength}).WithError(err).Warnf("HTTP request failed")
 	} else if rcvr.settings.Log204OK {
-		skogul.Printf("%d %s %d %s", code, r.RequestURI, r.ContentLength, "HTTP request ok")
+		log.Printf("%d %s %d %s", code, r.RequestURI, r.ContentLength, "HTTP request ok")
 		// httpLog.WithFields(log.Fields{
 		// 	"code":          code,
 		// 	"remoteAddress": r.RemoteAddr,
@@ -196,7 +196,7 @@ func (f fallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if f.hasAuth {
 		extra = " Authenticated handlers present, masking 404 as 401."
 	}
-	skogul.Errorf("%d %s %s %d HTTP request failed %s", code, r.RemoteAddr, r.RequestURI, r.ContentLength, extra)
+	log.Errorf("%d %s %s %d HTTP request failed %s", code, r.RemoteAddr, r.RequestURI, r.ContentLength, extra)
 	// httpLog.WithFields(log.Fields{
 	// 	"code":          code,
 	// 	"remoteAddress": r.RemoteAddr,
@@ -204,7 +204,7 @@ func (f fallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 	"ContentLength": r.ContentLength}).WithError(err).Warnf("HTTP request failed%s", extra)
 	if f.hasAuth {
 		code = 401
-		skogul.Errorf("Invalid credentials")
+		log.Errorf("Invalid credentials")
 		// err = fmt.Errorf("Invalid credentials")
 	}
 	answer(w, r, code, err)
@@ -218,7 +218,7 @@ func loadClientCertificateCAs(paths []string) (*x509.CertPool, error) {
 	for _, path := range paths {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
-			return nil, skogul.Errorf("failed to read certificate file: %s", err)
+			return nil, log.Errorf("failed to read certificate file: %s", err)
 			// return nil, fmt.Errorf("failed to read certificate file: %w", err)
 		}
 		pool.AppendCertsFromPEM(data)
@@ -232,7 +232,7 @@ func (htt *HTTP) Start() error {
 	serveMux := http.NewServeMux()
 	server.Handler = serveMux
 	for idx, h := range htt.Handlers {
-		skogul.Printf("%s %s %v", idx, h.Name, htt.Auth[idx] != nil)
+		log.Printf("%s %s %v", idx, h.Name, htt.Auth[idx] != nil)
 		// httpLog.WithFields(log.Fields{
 		// 	"configuredHandler": idx,
 		// 	"selectedHandler":   h.Name,
@@ -261,12 +261,12 @@ func (htt *HTTP) Start() error {
 			ClientAuth: tls.VerifyClientCertIfGiven,
 		}
 
-		skogul.Print("Configured HTTP receiver with Client Certificate authentication")
+		log.Print("Configured HTTP receiver with Client Certificate authentication")
 		// httpLog.Info("Configured HTTP receiver with Client Certificate authentication")
 		for _, auth := range htt.Auth {
 			if auth.SANDNSName != "" {
 				// httpLog.Info("Configured HTTP receiver with Client Certificate verification")
-				skogul.Print("Configured HTTP receiver with Client Certificate verification")
+				log.Print("Configured HTTP receiver with Client Certificate verification")
 				break
 			}
 		}
@@ -283,19 +283,19 @@ func (htt *HTTP) Start() error {
 	server.Addr = htt.Address
 	if htt.Certfile != "" {
 
-		skogul.Printf("Starting http receiver with TLS address %s", htt.Address)
+		log.Printf("Starting http receiver with TLS address %s", htt.Address)
 		err := server.ListenAndServeTLS(htt.Certfile, htt.Keyfile)
-		skogul.Fatalf(err.Error())
+		log.Fatalf(err.Error())
 		// httpLog.WithField("address", htt.Address).Info("Starting http receiver with TLS")
 		// httpLog.Fatal(server.ListenAndServeTLS(htt.Certfile, htt.Keyfile))
 	} else {
-		skogul.Printf("Starting INSECURE http receiver address %s", htt.Address)
+		log.Printf("Starting INSECURE http receiver address %s", htt.Address)
 		err := server.ListenAndServe()
-		skogul.Fatalf(err.Error())
+		log.Fatalf(err.Error())
 		// httpLog.WithField("address", htt.Address).Info("Starting INSECURE http receiver (no TLS)")
 		// httpLog.Fatal(server.ListenAndServe())
 	}
-	return skogul.Errorf("unreachable")
+	return log.Errorf("unreachable")
 	// return fmt.Errorf("unreachable")
 }
 
@@ -305,7 +305,7 @@ func (htt *HTTP) Start() error {
 func (auth *HTTPAuth) verifyPeerCertificate(_ [][]byte, verifiedChains [][]*x509.Certificate) error {
 	if auth.SkipCertificateVerify || auth.SANDNSName == "" {
 		// httpLog.WithFields(log.Fields{"skip": auth.SkipCertificateVerify, "dns_name": auth.SANDNSName}).Trace("Skipping verifying certificate")
-		skogul.Printf("Skipping verifying certificate")
+		log.Printf("Skipping verifying certificate")
 		return nil
 	}
 
@@ -317,16 +317,18 @@ func (auth *HTTPAuth) verifyPeerCertificate(_ [][]byte, verifiedChains [][]*x509
 			continue
 		}
 		cert := chain[0]
-		certDebugLogger := certLogger.WithFields(log.Fields{
-			"issuer":           cert.Issuer,
-			"subject":          cert.Subject,
-			"num_dns_names":    len(cert.DNSNames),
-			"num_emails":       len(cert.EmailAddresses),
-			"num_ip_addresses": len(cert.IPAddresses),
-			"num_uris":         len(cert.URIs),
-			"num_x509_ext":     len(cert.Extensions),
-		})
-		certDebugLogger.Trace("Verifying certificate")
+		// certDebugLogger := certLogger.WithFields(log.Fields{
+		// 	"issuer":           cert.Issuer,
+		// 	"subject":          cert.Subject,
+		// 	"num_dns_names":    len(cert.DNSNames),
+		// 	"num_emails":       len(cert.EmailAddresses),
+		// 	"num_ip_addresses": len(cert.IPAddresses),
+		// 	"num_uris":         len(cert.URIs),
+		// 	"num_x509_ext":     len(cert.Extensions),
+		// })
+		log.Printf("issuer %s\nsubject %s\nnum_dns_names %d\nnum_emails %d\nnum_ip_addresses %d\nnum_uris %d\nnum_x509_ext %d\n", cert.Issuer, cert.Subject, len(cert.DNSNames), len(cert.EmailAddresses), len(cert.IPAddresses), len(cert.URIs), len(cert.Extensions))
+		log.Println("Verifying certificate")
+		// certDebugLogger.Trace("Verifying certificate")
 		for _, dnsName := range cert.DNSNames {
 			if auth.SANDNSName != "" && strings.ToLower(dnsName) == strings.ToLower(auth.SANDNSName) {
 				// If we find a matching DNS name in the SANs, we return non-error
@@ -339,14 +341,14 @@ func (auth *HTTPAuth) verifyPeerCertificate(_ [][]byte, verifiedChains [][]*x509
 	// we return an error to tell the verifying function that this certificate
 	// is not verified, and access is denied.
 	// This will present the user with a 'bad certificate' alert.
-	return skogul.Errorf("failed to verify x509 SAN DNS Name")
+	return log.Errorf("failed to verify x509 SAN DNS Name")
 	// return fmt.Errorf("failed to verify x509 SAN DNS Name")
 }
 
 // Verify verifies the configuration for the HTTP receiver
 func (htt *HTTP) Verify() error {
 	if htt.Handlers == nil || len(htt.Handlers) == 0 {
-		return skogul.MissingArgument("Handlers")
+		return log.Errorf("Missing handlers")
 	}
 
 	if htt.Address == "" {
@@ -357,24 +359,24 @@ func (htt *HTTP) Verify() error {
 		httpLog.Warn("HTTP receiver configured with authentication but not with TLS! Auth will happen in the open!")
 	}
 	if (htt.Certfile != "" && htt.Keyfile == "") || (htt.Certfile == "" && htt.Keyfile != "") {
-		return fmt.Errorf("Specify both Certfile AND Keyfile or none at all")
+		return log.Errorf("Specify both Certfile AND Keyfile or none at all")
 	}
 	cas, err := loadClientCertificateCAs(htt.ClientCertificateCAs)
 	if err != nil {
-		return skogul.Errorf("unable to load client certificate CAs: %w", err)
+		return log.Errorf("unable to load client certificate CAs: %w", err)
 		// return fmt.Errorf("unable to load client certificate CAs: %w", err)
 	}
 	for _, auth := range htt.Auth {
 		if auth.Username != "" && auth.Password == "" {
-			return skogul.Errorf("Username specified but no password.")
+			return log.Errorf("Username specified but no password.")
 			// return fmt.Errorf("Username specified but no password.")
 		}
 		if auth.Username == "" && auth.Password != "" {
-			return skogul.Errorf("Password specified but no username.")
+			return log.Errorf("Password specified but no username.")
 			// return fmt.Errorf("Password specified but no username.")
 		}
 		if auth.SANDNSName != "" && cas == nil {
-			return skogul.Errorf("No Client Certificate Cas defined, but DNS Name for SAN specified. Specify ClientCertificateCAs configuration element.")
+			return log.Errorf("No Client Certificate Cas defined, but DNS Name for SAN specified. Specify ClientCertificateCAs configuration element.")
 			// return fmt.Errorf("No Client Certificate CAs defined, but DNS Name for SAN specified. Specify ClientCertificateCAs configuration element.")
 		}
 	}

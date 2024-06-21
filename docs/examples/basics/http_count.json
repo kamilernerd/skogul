@@ -13,10 +13,6 @@
     }
   },
   "handlers": {
-    "loghandler": {
-      "parser": "skogul",
-      "sender": "log-batch"
-    },
     "jsontemplating": {
       "parser": "skogul",
       "transformers": [],

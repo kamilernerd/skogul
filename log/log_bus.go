@@ -1,13 +1,13 @@
 package skogul
 
 import (
-	// "encoding/json"
+	"github.com/telenornms/skogul"
 	"fmt"
 	"time"
 )
 
 type LogBus struct {
-	queue           chan Metric
+	queue           chan skogul.Metric
 	aggregator      *LogAggregator
 	writers         map[string]func(msg string)
 	logWrites       int
@@ -33,7 +33,7 @@ func (bus *LogBus) RWStats() {
 	}
 }
 
-func (bus *LogBus) Push(v Metric) {
+func (bus *LogBus) Push(v skogul.Metric) {
 	select {
 	case bus.queue <- v:
 		bus.logWrites++
@@ -54,15 +54,15 @@ func (bus *LogBus) Sink() {
 	}
 }
 
-var LogHandler HandlerRef
+var LogHandler skogul.HandlerRef
 
 func (bus *LogBus) Flusher() {
 	for {
 		select {
 		case q := <-bus.aggregator.outQueue:
-			metrics := make([]*Metric, 1)
+			metrics := make([]*skogul.Metric, 1)
 			metrics[0] = &q
-			c := Container{
+			c := skogul.Container{
 				Metrics: metrics,
 			}
 
