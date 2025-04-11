@@ -100,7 +100,7 @@ fmtfix:
 
 printfcheck:
 	@echo 📖 Looking for printf-debugging left over
-	@! find -not -wholename './cmd/*' -and -not -wholename '*_test.go' -and -not -wholename './config/parse.go' -and -not -wholename './sender/debug.go' -and -name '*.go' -exec egrep fmt.Printf {} +
+	@! find . -name '*.go' -not -wholename './cmd/*' -and -not -wholename '*_test.go' -and -not -wholename './config/parse.go' -and -not -wholename './sender/debug.go' -and -exec egrep fmt.Printf {} +
 
 exampletest: skogul
 	@echo 📖 Verifying examples
